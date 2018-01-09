@@ -1,2 +1,5 @@
 # Monte_Carlo
-Exercices Monte Carlo Statical Methods
+
+Exercices en R du livre "Monte Carlo Statical Methods": http://www.springer.com/us/book/9780387212395
+
+R Markdown converti en HTML
