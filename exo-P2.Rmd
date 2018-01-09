@@ -1,0 +1,260 @@
+---
+title: "Exercices Part 2"
+author: "Thomas Levy"
+date: "23 novembre 2017"
+output:
+  html_document:
+    #code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Ex 7.1:
+
+Calculer la moyenne d'une variable aléatoire Gamma(4.3,6.2) en utilisant differentes methodes.
+
+NOTE: Pour mieux etudier la convergence, on calcule la moyenne théorique:
+```{r}
+tmoy=4.3/6.2
+print (tmoy)
+```
+
+
+### (a) Accept-Reject avec un candidat Gamma(4,6)
+Moyenne et courbe de convergence:
+```{r}
+nElements=10000
+x=rgamma(nElements,4,6)
+u=runif(nElements)
+
+ratio=function(x){
+  dgamma(x, 4.3,6.2)/dgamma(x,4,6)
+}
+M=optimise (ratio, interval = c(0,10), maximum = TRUE)$objective
+
+accept=x[M*u*dgamma(x,4,6)<=dgamma(x,4.3,6.2)]
+
+print(mean(accept))
+
+nSimul1 =length(accept) 
+est1=cumsum(accept)/(1:nSimul1)
+plot(est1,type="l",xlab="iterations",ylab="",lwd=1,col="blue",main="Moyenne de X (avec Accept-Reject)" )
+abline(a=4.3/6.2,b=0,col="gray")
+```
+
+### (b) Metro-Hastings avec un candidat Gamma(4,7)
+Moyenne et courbe de convergence:
+```{r}
+g47=rgamma(nElements,4,7)
+X=rep(0,nElements)
+X[1]=rgamma(1,4.3,6.2)
+for (t in 2:nElements){
+  prob=(dgamma(X[t-1],4,7)*dgamma(g47[t],4.3,6.2))/
+    (dgamma(g47[t],4,7)*dgamma(X[t-1],4.3,6.2))
+  X[t]=X[t-1]+(g47[t]-X[t-1])*(runif(1)<prob)
+}
+print(mean(X))
+
+nSimul2 =length(X) 
+est2=cumsum(X)/(1:nSimul2)
+plot(est2,type="l",xlab="iterations",ylab="",lwd=1,col="green",main="Moyenne de X avec MH Gamma(4,7)")
+abline(a=4.3/6.2,b=0,col="gray")
+```
+
+
+### (c) Metro-Hastings avec un candidat Gamma(5,6)
+Moyenne et courbe de convergence:
+```{r}
+g56=rgamma(nElements,5,6)
+X[1]=rgamma(1,4.3,6.2)
+for (t in 2:nElements){
+  prob=(dgamma(X[t-1],5,6)*dgamma(g56[t],4.3,6.2))/
+    (dgamma(g56[t],5,6)*dgamma(X[t-1],4.3,6.2))
+  X[t]=X[t-1]+(g56[t]-X[t-1])*(runif(1)<prob)
+}
+print(mean(X))
+nSimul3 =length(X) 
+est3=cumsum(X)/(1:nSimul3)
+plot(est3,type="l",xlab="iterations",ylab="",lwd=1,col="black",main="Moyenne de X avec MH Gamma(5,6)")
+abline(a=4.3/6.2,b=0,col="gray")
+```
+
+## Analyse
+D'apres les courbes, les 3 methodes convergent bien vers la moyenne (pour laquelle on a tracé une droite en gris)
+
+
+## Ex 7.2:
+
+Calculer la moyenne d'une t ditribution avec 4 degrés de liberté avec Metro-Hastings.
+
+### (a) Avec un candidat N(0,1)
+
+```{r}
+nElements=100000
+
+n1=rnorm(nElements)
+X=rep(0,nElements)
+nAccept=0
+for (t in 2:nElements){
+  prob=((dt(n1[t],df=4)*dnorm(x[t-1])) / (dt(x[t-1],df=4)*dnorm(n1[t])))
+  #prob=((dt(n1[t],4)) / (dt(x[t-1],4)))
+  if (is.na(prob)) {
+    prob=1
+  }
+  test=runif(1)
+  if (test<prob){
+    nAccept=nAccept+1
+  }
+  X[t]=X[t-1]+(n1[t]-X[t-1])*(test<prob)
+}
+print(mean(X))
+
+nSimul2 =length(X) 
+est2=cumsum(X)/(1:nSimul2)
+plot(est2,type="l",xlab="iterations",ylab="",lwd=1,col="blue",main="Moyenne de X avec MH N(0,1)")
+abline(a=0,b=0,col="gray")
+```
+
+
+Au final (apres 100000 iterations), la moyenne converge bien vers la moyenne théorique. Néanmoins, la convergence est relativement lente.
+
+On verifie le taux d'acceptation:
+```{r}
+print(nAccept/nElements)
+```
+
+
+### (b) Avec un candidat t avec 2 degrés de liberté
+
+```{r}
+t2=rt(nElements,df=2)
+X=rep(0,nElements)
+nAccept=0
+for (t in 2:nElements){
+  prob=((dt(t2[t],df=4)*dt(x[t-1],df=2)) / (dt(x[t-1],df=4)*dt(t2[t],df=2)))
+  if (is.na(prob)) {
+    prob=1
+  }
+  test=runif(1)
+  if (test<prob){
+    nAccept=nAccept+1
+  }
+  X[t]=X[t-1]+(t2[t]-X[t-1])*(runif(1)<test)
+}
+print(mean(X))
+
+nSimul2 =length(X) 
+est2=cumsum(X)/(1:nSimul2)
+plot(est2,type="l",xlab="iterations",ylab="",lwd=1,col="blue",main="Moyenne de X avec MH Student")
+abline(a=0,b=0,col="gray")
+print(nAccept/nElements)
+```
+
+Comme dans le cas precedent, au final (apres 100000 iterations), la moyenne converge bien vers la moyenne théorique. Néanmoins, la convergence est relativement lente.
+On verifie le taux d'acceptation (qui est proche de 1)
+
+
+## Ex 7.24:
+Metropolis-Hastings pour f~N(0,1) avec candidate suit une U[-x-delta,-x+delta]
+
+### Pour delta=0.2
+
+```{r}
+nElements=10000
+X=rep(0,nElements)
+delta=0.2
+for (t in 2:nElements){
+  Y=runif(1,min=-X[t-1]-delta,max=-X[t-1]+delta)
+  prob=dnorm(Y)/dnorm(X[t-1])
+  if (is.na(prob)) {
+    prob=1
+  }
+  if (runif(1)<prob){
+    X[t]=Y
+  }
+  else
+  {
+    X[t]=X[t-1]
+  }
+}
+#print(mean(X))
+hist(X,col= "blue",breaks = 50)
+acf(X)
+```
+
+
+**Pour delta=0.2, le résultat de la fonction d'autocorrellation montre une correllation négative significative entre X[t] et X[t+1].**
+
+### Pour delta=2
+
+```{r}
+nElements=10000
+X=rep(0,nElements)
+delta=2
+for (t in 2:nElements){
+  Y=runif(1,min=-X[t-1]-delta,max=-X[t-1]+delta)
+  prob=dnorm(Y)/dnorm(X[t-1])
+  if (is.na(prob)) {
+    prob=1
+  }
+  if (runif(1)<prob){
+    X[t]=Y
+  }
+  else
+  {
+    X[t]=X[t-1]
+  }
+}
+#print(mean(X))
+hist(X,col= "blue",breaks = 50)
+acf(X)
+```
+
+
+**Pour delta=2, le résultat de la fonction d'autocorrellation montre une correllation faible (non significative) entre X[t] et X[t+1].**
+
+
+## Ex 9.2
+
+### Gibbs sampler pour (X,Y)
+Bi-variables aléatoires normales (avec moyenne 0, variance 1 et correlation p)
+Exemple pour p=0.3:
+```{r}
+nElements=10000
+burnin=500
+X=rep(0,nElements)
+Y=rep(0,nElements)
+p=0.3
+x=0
+y=0
+for (t in 2:nElements+burnin){
+  x=rnorm(1,p*y,1-(p*p))
+  y=rnorm(1,p*x,1-(p*p))
+    if (t > burnin){
+      X[t - burnin]= x
+      Y[t - burnin]= y
+    }
+}
+
+op = par(mfcol=c(1,2),bg="white")
+hist(X,col= "blue",breaks=50)
+hist(Y,col= "green",breaks=50)
+```
+
+### Etude de X^2 + Y^2
+Soit Z= X^2+ Y^2, on estime sa densité:
+```{r}
+Z=X^2+Y^2
+op = par(mfcol=c(1,2),bg="white")
+plot(density(Z),type="l",xlab="Z",ylab="",lwd=1,col="blue",main="Densité de Z")
+hist(Z,col= "blue",breaks = 50,main="Histogramme de Z")
+```
+
+P(Z>2):
+```{r}
+Zsup=Z[Z>2]
+length(Zsup)/length(Z)
+```
+

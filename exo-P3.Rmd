@@ -1,0 +1,366 @@
+---
+title: "Exercices Part 3"
+author: "Thomas Levy"
+date: "12 décembre 2017"
+output:
+  html_document:
+    #code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Ex 7.12:
+Generation d'une chaine de N(0,1) avec une random walk U[-delta,delta] en faisant varier delta.
+
+### Convergence Rate
+
+```{r}
+nElements=20000
+iqRange = function(delta){
+  X=rep(0,nElements)
+  nAccept=1
+  for (t in 2:nElements){
+    y=runif(1,min=-delta,max=+delta)+X[t-1]
+    prob=min(exp((X[t-1]^2 - y^2)/2),1)
+    if (runif(1)<prob){
+      X[t]=y
+      nAccept=nAccept+1
+    }
+    else
+    {
+      X[t]=X[t-1]
+    }
+  }
+  return (quantile(X,0.9)-quantile(X,0.1))
+}
+
+dvalues= c(0.1,0.2,0.5,0.8,1,2,3,4,5,6,7,8,9,10)
+iqRanges = lapply(dvalues,iqRange)
+plot(x=dvalues,y=iqRanges,type="l",xlab="delta",ylab="iq-rate",lwd=1,col="blue",main="Convergence Rate")
+abline(a=2.56,b=0,col="gray")
+```
+
+On constate que l'inter-quantile à 90% converge assez rapidement vers sa valeur théorique pour une lois normale (soit 2.56) tracée en gris.
+
+### Acceptance Rate
+
+```{r}
+acceptRate = function(delta){
+  X=rep(0,nElements)
+  nAccept=1
+  for (t in 2:nElements){
+    y=runif(1,min=-delta,max=+delta)+X[t-1]
+    prob=min(exp((X[t-1]^2 - y^2)/2),1)
+    if (runif(1)<prob){
+      X[t]=y
+      nAccept=nAccept+1
+    }
+    else
+    {
+      X[t]=X[t-1]
+    }
+  }
+  return (nAccept/nElements)
+}
+
+acceptrates = lapply(dvalues,acceptRate)
+
+plot(x=dvalues,y=acceptrates,type="l",xlab="delta",ylab="Accept-rate",lwd=1,col="blue",main="Acceptance Rate")
+```
+
+Le taux d'acceptation décroit avec delta. Ce qui est logique.
+
+### Minimisation de la variance de la moyenne empirique
+
+Pour chaque valeur de delta, on va generer la chaine 100 fois. Chaque fois, on calculera la moyenne empirique afin de pouvoir determiner la variance de cette moyenne empirique.
+```{r}
+nIterations= 100
+nElements=1000
+empVariance = function(delta){
+  empMean=rep(0,nIterations)
+  for (i in 1:nIterations){
+    X=rep(0,nElements)
+    nAccept=1
+    for (t in 2:nElements){
+      y=runif(1,min=-delta,max=+delta)+X[t-1]
+      prob=min(exp((X[t-1]^2 - y^2)/2),1)
+      if (runif(1)<prob){
+        X[t]=y
+        nAccept=nAccept+1
+      }
+      else
+      {
+        X[t]=X[t-1]
+      }
+    }
+    empMean[i]=mean(X)
+  }
+  return (var(empMean))
+}
+
+dvalues= c(0.1,0.2,0.5,0.8,1,2,3,4,5,6,7,8,9,10)
+empVariances = lapply(dvalues,empVariance)
+plot(x=dvalues,y=empVariances,type="l",xlab="delta",ylab="Var",lwd=1,col="blue",main="Variance of the empirical mean")
+
+```
+
+Le minimum de variance semble se trouver entre 2 et 10. Mais, cette courbe ne nous permet pas de conclure. Aussi, on va tracer une autre courbe plus re-centrée.
+
+```{r}
+dvalues= seq(2,10,0.5)
+empVariances = lapply(dvalues,empVariance)
+plot(x=dvalues,y=empVariances,type="l",xlab="delta",ylab="Var",lwd=1,col="blue",main="Variance of the empirical mean")
+
+```
+
+Au vu de cette courbe, le miminum de variance semble etre aux alentour de delta=4.
+
+## Ex 7.6:
+
+D'après 7.5, la distribution stationaire f(x) est:
+$f(x) =\propto \frac{g(x)}{1-\rho(x)}$
+
+
+Donc pour une loi Be(alpha+1,1):
+$f(x)\propto x^{\alpha-1}$
+
+Donc, par exemple pour alpha=1, f(x) est une distribution uniforme. Ce qu'on va valider avec l'implementation de l'algo "Repeat or Simulate" plus bas:
+
+### Implementation de l'algo Repeat or Simulate
+
+On vérifié la densité de X pour alpha=0.5, 1 et 1.5. 
+```{r}
+nElements=10000
+
+repeatAlgo=function(alpha){
+  X=rep(0,nElements)
+  X[1]=rbeta(1, alpha + 1, 1)
+  for (i in 2:nElements){
+    if (runif(1) < (1-X[i-1])){ #Repeat
+      X[i]= X[i-1]
+    }
+    else{ #Simulate
+      X[i]= rbeta(1, alpha + 1, 1)
+      #print(X[i])
+    }
+  }
+  return(X)
+}
+
+#alpha=0.5
+Y=repeatAlgo(0.5)
+V=repeatAlgo(1)
+Z=repeatAlgo(1.5)
+
+op = par(mfcol=c(1,3),bg="white")
+hist(Y,col= "blue",breaks = 50,main="Histogramme de X (alpha=0.5)")
+hist(V,col= "blue",breaks = 50,main="Histogramme de X (alpha=1)")
+hist(Z,col= "blue",breaks = 50,main="Histogramme de X (alpha=1.5)")
+```
+
+Ces densités s'approchent bien de la distribution stationaire de f(x) determinée précédemment (avec différentes valeurs d'alpha)
+
+### Determination de l'acceptance rate
+On suppose ici que l'accept correspond au cas ou l'algo fait du repeat.
+On trace la courbe de l'acceptance-rate pour differentes valeurs de alpha (entre 0.2 et 2)
+```{r}
+repeatAlgoRate=function(alpha){
+  X=rep(0,nElements)
+  X[1]=rbeta(1, alpha + 1, 1)
+  nAccept=1
+  for (i in 2:nElements){
+    if (runif(1) < (1-X[i-1])){ #Repeat
+      X[i]= X[i-1]
+      nAccept=nAccept+1
+    }
+    else{ #Simulate
+      X[i]= rbeta(1, alpha + 1, 1)
+      #print(X[i])
+    }
+  }
+  return(nAccept/nElements)
+}
+
+avalues=seq(0.2,2,0.2)
+repeatAlgoRates = lapply(avalues,repeatAlgoRate)
+
+op = par(mfcol=c(1,1),bg="white")
+plot(x=avalues,y=repeatAlgoRates,type="l",xlab="alpha",ylab="AR",lwd=1,col="blue",main="Acceptance rate")
+
+```
+
+
+## Ex 8.4:
+D'après l'exercice 8.3, on sait qu'on peut simuler une chaine X(t) suivant f(x) avec l'algo A.31 même si la fonction f(x) est non-normalisée.
+Donc pour évaluer la performance du slice sampler, on va comparer la densité de la chaine simulée (avec f(x) non-normalisée) avec la densité théorique f(x) (non normalisée).
+A une constante multiplicative pres, les courbes de densité simulée et théorique avec f(x) devraient etre les mêmes.
+
+### Pour d=0.4
+```{r}
+slice = function(d,n){
+  burnin=1000
+  samples = rep(0, n)
+  x=1 #Initialize at 1
+  for (t in 1:(burnin + n)){
+    u = runif(1,0, exp(-x^d))
+    X = runif(1,0, (-log(u))^(1/d))
+    if (t > burnin){
+      samples[t - burnin]= X
+    }
+  }
+  return(samples)
+}
+
+d=0.4
+nElements=50000
+Delta = 0.1
+x = seq(from=0, to=100, by = Delta)
+op = par(mfcol=c(1,2),bg="white")
+slicesamples= slice(d,nElements)
+plot(density(slicesamples),type="l",xlab="x",ylab="f",xlim=c(0,100),lwd=1,col="blue",main="Densité du sample")
+plot(x=x,y=exp(-x^d),type="l",xlab="x",ylab="f",xlim=c(0,100),lwd=1,col="blue",main="Densité théorique")
+
+```
+
+Dans ce cas, la densité théorique de f(x) et la densité du sample sont assez proche donc la simulation semble de bonne qualité.
+
+### Pour d=0.25
+```{r}
+d=0.25
+nElements=100000
+Delta = 1
+x = seq(from=0, to=200, by = Delta)
+op = par(mfcol=c(1,2),bg="white")
+slicesamples= slice(d,nElements)
+plot(density(slicesamples),type="l",xlab="x",ylab="f",xlim=c(0,200),lwd=1,col="blue",main="Densité du sample")
+plot(x=x,y=exp(-x^d),type="l",xlab="x",ylab="f",xlim=c(0,200),lwd=1,col="blue",main="Densité théorique")
+
+```
+
+Dans ce cas, la densité théorique de f(x) et la densité du sample s'eccartent donc la simulation n'est plus de bonne qualité.
+
+
+### Pour d=0.1
+```{r}
+d=0.1
+Delta = 1
+x = seq(from=0, to=1000, by = Delta)
+op = par(mfcol=c(1,3),bg="white")
+slicesamples= slice(d,nElements)
+plot(density(slicesamples),type="l",xlab="x",ylab="f",xlim=c(0,1000),lwd=1,col="blue",main="Densité du sample")
+plot(x=x,y=exp(-x^d),type="l",xlab="x",ylab="f",xlim=c(0,1000),lwd=1,col="blue",main="Densité théorique")
+hist(slicesamples)
+```
+
+Dans ce cas, la densité du sample n'a plus rien à voir avec la densité théorique. L'histogramme confirme que les valeurs simulées s'eccartent énormement des valeurs théoriques. La performance est très mauvaise dans ce cas.
+
+
+## Ex 10.2:
+On va utiliser l'algorithm Gibbs sampler pour simuler le modele Isling.
+On dira que les elements S du modele peuvent être representés à 2 dimensions avec un indice matriciel (n par n) ou un indice à 1 dimension (nxn).
+Si on considere S sous forme à une dimension, on peut appliquer Gibbs sampler sur ses loi conditionnelles pour chaque indice de 1 à nxn.
+
+###Implementation
+On génère d'abbord un modele initial (taille nxn) avec des valeurs aléatoires {-1,1}.
+```{r}
+n=100
+s=matrix(1-2*rbinom(n*n,1,0.5),n,n)
+
+displayMatrix=function(s,text){
+  x= 10*(1:n)
+  y= 10*(1:n)
+  #image(x, y, s, col = terrain.colors(100), axes = FALSE)
+  image(x, y, s, col = c("white","blue"), axes = FALSE)
+  contour(x, y, s, levels = seq(90, 200, by = 5),
+          add = TRUE, col = "gray")
+  #axis(1, at = seq(100, 800, by = 100))
+  #axis(2, at = seq(100, 600, by = 100))
+  box()
+  title(main = text, font.main = 4)
+}
+displayMatrix(s,"Matrice initiale")
+```
+
+
+Apres 100 iterations de Gibbs-Sampler:
+```{r}
+H=0.5
+J=0.5
+nIterations=100
+for (nIt in 1:nIterations) {
+  for (i in 1:n){
+    for (j in 1:n) {
+      #First compute sum of neighbors
+      sumN=0
+      if (i > 1) {
+        sumN=sumN+s[i-1,j]
+      }
+      if (i < n) {
+        sumN=sumN+s[i+1,j]
+      }
+      if (j > 1) {
+        sumN=sumN+s[i,j-1]
+      }
+      if (j < n) {
+        sumN=sumN+s[i,j+1]
+      }
+    #print(i)
+    #print(j)
+    #print(sumN)
+      prob=exp(-(H+(J*sumN)*(s[i,j]+1)))/(1+exp(-2*(H+(J*sumN))))
+      #print(prob)
+      #s[i,j]=1
+      if (runif(1)>prob) #Switch the value
+      {
+        s[i,j]= -1*s[i,j]
+      }
+      #print(p)                                 
+    }
+  }
+}
+
+displayMatrix(s,"Matrice après 100 iterations")
+```
+
+Apres 500 iterations supplémentaires de Gibbs-Sampler:
+```{r}
+nIterations=500
+for (nIt in 1:nIterations) {
+  for (i in 1:n){
+    for (j in 1:n) {
+      #First compute sum of neighbors
+      sumN=0
+      if (i > 1) {
+        sumN=sumN+s[i-1,j]
+      }
+      if (i < n) {
+        sumN=sumN+s[i+1,j]
+      }
+      if (j > 1) {
+        sumN=sumN+s[i,j-1]
+      }
+      if (j < n) {
+        sumN=sumN+s[i,j+1]
+      }
+    #print(i)
+    #print(j)
+    #print(sumN)
+      prob=exp(-(H+(J*sumN)*(s[i,j]+1)))/(1+exp(-2*(H+(J*sumN))))
+      #print(prob)
+      #s[i,j]=1
+      if (runif(1)>prob) #Switch the value
+      {
+        s[i,j]= -1*s[i,j]
+      }
+      #print(p)                                 
+    }
+  }
+}
+
+displayMatrix(s,"Matrice après 500 iterations")
+```
+
+
+
