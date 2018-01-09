@@ -1,0 +1,234 @@
+---
+title: "Exercices Part 1"
+author: "Thomas Levy"
+date: "2 novembre 2017"
+output:
+  html_document:
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Ex 1.1:
+### Censored data model:
+- <span style="color:blue"> Densité de X </span>
+- <span style="color:gray"> Densité de Y </span>
+- <span style="color:red">  Densité de Z = min (X,Y) </span> 
+
+```{r ex11a, echo=TRUE}
+Delta = 0.1
+x = seq(from=-5, to=5, by = Delta)
+theta=0
+sigma=1
+mu=1
+tau=1
+
+#Censored data model
+censored = function(x, theta, sigma, mu, tau){
+  return((1 - pnorm((x - theta) / sigma)) *
+           (1 / tau) * dnorm((x - mu) / tau) +
+           (1 - pnorm((x - mu) / tau)) *
+           (1 / sigma) * dnorm((x - theta) / sigma))
+}
+
+plot(x, censored(x,theta,sigma,mu,tau),
+     type = "l", lwd = 3,
+     main = "Densité de probabilité de X, Y & Z avec theta=0, sigma=1, mu=1, tau=1",
+     xlab = "x", ylab = "f(x)", col = "red")
+
+lines(x, dnorm(x,theta,sigma), lwd = 1, col = "blue")
+lines(x, dnorm(x,mu,tau), lwd = 1, col = "gray")
+
+theta=0
+sigma=1
+mu=0
+tau=2
+plot(x, dnorm(x,theta,sigma),
+     type = "l", lwd = 1,
+     main = "Densité de probabilité de X, Y & Z avec theta=0, sigma=1, mu=0, tau=2",
+     xlab = "x", ylab = "f(x)", col = "blue")
+
+#lines(x, dnorm(x,theta,sigma), lwd = 1, col = "blue")
+lines(x, dnorm(x,mu,tau), lwd = 1, col = "gray")
+lines(x, censored(x,theta,sigma,mu,tau), lwd = 3, col = "red")
+
+```
+
+### Mixture data model:
+
+- <span style="color:blue"> Densité de X </span>
+- <span style="color:gray"> Densité de Y </span>
+- <span style="color:red">  Densité de Z: p * fx(x) + (1-p) * fy(x) </span> 
+
+```{r ex11b, echo=TRUE}
+mixture = function(x, theta, sigma, mu, tau, p){
+  return(p * dnorm(x, theta, sigma) +
+           (1 - p) * dnorm(x, mu, tau))
+}
+
+theta=-2
+sigma=1
+mu=2
+tau=1
+p=0.5
+plot(x, dnorm(x,theta,sigma),
+     type = "l", lwd = 1,
+     main = "Densités de proba avec theta=-2, sigma=1, mu=2, tau=2, p=0.5",
+     xlab = "x", ylab = "f(x)", col = "blue")
+
+#lines(x, dnorm(x,theta,sigma), lwd = 1, col = "blue")
+lines(x, dnorm(x,mu,tau), lwd = 1, col = "gray")
+lines(x, mixture(x,theta,sigma,mu,tau,p), lwd = 3, col = "red")
+
+theta=-2
+sigma=1
+mu=2
+tau=1
+p=0.1
+plot(x, dnorm(x,theta,sigma),
+     type = "l", lwd = 1,
+     main = "Densités de proba avec theta=-2, sigma=1, mu=2, tau=2, p=0.1",
+     xlab = "x", ylab = "f(x)", col = "blue")
+
+#lines(x, dnorm(x,theta,sigma), lwd = 1, col = "blue")
+lines(x, dnorm(x,mu,tau), lwd = 1, col = "gray")
+lines(x, mixture(x,theta,sigma,mu,tau,p), lwd = 3, col = "red")
+
+```
+
+
+## Ex 2.1:
+Generation de 1000 variables uniformes sur [0,1]
+
+```{r ex21a, echo=TRUE}
+nElements = 1000
+
+x = runif(nElements)
+
+hist(x,col= "blue",main="Histogramme (avec 10 niveaux)",breaks = 10)
+
+hist(x,col= "blue",main="Histogramme (avec 50 niveaux)", breaks = 50)
+
+
+nElements = 1000
+x = runif(nElements)
+plot(x[1:nElements-1],x[2:nElements],type="p",col= "blue",xlab="x[i]",ylab="x[i+1]",pch=1,
+     main="Affichage des (x[i],x[i+1])")
+y= c(0,1)
+lines(y, y, lwd = 1, col = "gray")
+
+```
+
+### Analyse
+Le tracé du dessus nous indique qu'il ne semble pas y avoir de correlation entre x[i] et x[i+1] car les points ne sont pas particulierement regroupés vers la droite y=x (tracée en gris).
+Par contre, aussi bien l'histogramme que le tracé (avec les points regroupés en grappe) semble indiquer que la génération n'est pas tout à fait uniforme.
+
+
+## Ex 2.3: 
+Generation de variables aléatoires avec courbe de densité correspondante.
+
+- <span style="color:blue"> Densité de loi f à simuler </span>
+
+- <span style="color:gray"> Densité de loi g supérieure utilisée pour générer les aléas. </span>
+
+### (a) Loi normale avec Cauchy en Accept-Reject
+```{r}
+nElements = 200
+Delta = 0.1
+
+i = seq(from=-5, to=5, by = Delta)
+
+#We use the optimal C const 
+C= 1.52
+
+x=rcauchy(nElements)
+u=runif(nElements)
+
+plot(x=i, y=C* dcauchy(i),
+     type = "l", lwd = 1,
+     main = "",
+     xlab = "x", ylab = "y", col = "black")
+lines(x=i, y=dnorm(i), lwd = 1, col = "blue")
+#points(x=x,y=C*u*dcauchy(x),pch=20,col= "blue")
+for (j in (1:nElements))
+{
+  #print(j,u[j],y,)
+  y = C*u[j]*dcauchy(x[j])
+  if ( y <= dnorm(x[j])) {
+    points(x=x[j],y=y,pch=20,col= "blue") 
+  } else {
+    points(x=x[j],y=y,pch=20,col= "gray")
+  }
+}
+```
+
+### (b) Loi Gamma avec Gamma en Accept-Reject
+```{r}
+i = seq(from=0, to=100, by = Delta)
+
+#We use an empirical C const
+C=1.2
+plot(x=i, y=C* dgamma(i,shape=4,scale=7),
+     type = "l", lwd = 1,
+     main = "",
+     xlab = "x", ylab = "y", col = "black")
+lines(x=i, y=dgamma(i,shape=4.3,scale=6.2), lwd = 1, col = "blue")
+
+x=rgamma(nElements,shape=4,scale=7)
+u=runif(nElements)
+for (j in (1:nElements))
+{
+  #print(j,u[j],y,)
+  y = C*u[j]*dgamma(x[j],shape=4,scale=7)
+  if ( y <= dgamma( x[j],shape=4.3,scale=6.2) ) {
+    #print(j,y,u[j])
+    points(x=x[j],y=y,pch=20,col= "blue") 
+  } else {
+    points(x=x[j],y=y,pch=20,col= "gray")
+  }
+}
+```
+
+### (c) Loi Normale tronquée en (2,infini) avec loi exponentielle en Accept-Reject
+```{r}
+nElements = 200
+Delta = 0.01
+ipos = seq(from=1.99, to=5, by = Delta)
+
+mu=2
+#alpha= mu/2 + sqrt((mu*mu)+4)/2
+#C= 1/alpha*exp((alpha*alpha)/2-(alpha*mu))
+alpha=2
+C= 0.03
+
+
+plot(x=ipos, y=C*dexp(ipos-mu,alpha),
+     type = "l", lwd = 1,
+     main = "",
+     xlab = "x", ylab = "y", col = "black")
+
+#lines(x=ipos, y=C*dexp(ipos-mu,alpha), lwd = 1, col = "black")
+lines(x=ipos, y=dnorm(ipos), lwd = 1, col = "blue")
+
+x=rexp(nElements,alpha)+mu
+u=runif(nElements)
+
+#points(x=x,y=C*u*dexp(x-mu,alpha),pch=20,col= "blue")
+
+for (j in (1:nElements))
+{
+  #print(j,u[j],y,)
+  y = C*u[j]*dexp(x[j]-mu,alpha)
+  if ( y <= dnorm(x[j]) ) {
+    #print(j)
+    points(x=x[j],y=C*u[j]*dexp(x[j]-mu,alpha),pch=20,col= "blue") 
+  } else {
+    points(x=x[j],y=C*u[j]*dexp(x[j]-mu,alpha),pch=20,col= "gray")
+  }
+}
+
+
+```
+
